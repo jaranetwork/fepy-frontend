@@ -1,8 +1,8 @@
 <template>
   <v-app>
-    <v-app-bar app color="primary" dark>
+    <v-app-bar v-if="!isLoginPage" app color="primary" dark>
       <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
-      <v-toolbar-title>Sistema de Facturación Electrónica SIFEN</v-toolbar-title>
+      <v-toolbar-title>Facturación Electrónica Paraguay</v-toolbar-title>
 
       <v-spacer></v-spacer>
 
@@ -51,11 +51,11 @@
       </v-menu>
     </v-app-bar>
 
-    <v-navigation-drawer v-model="drawer" app>
+    <v-navigation-drawer v-if="!isLoginPage" v-model="drawer" app>
       <v-list>
         <v-list-item link to="/">
           <v-list-item-title class="text-h6 font-weight-bold">
-            SIFEN Dashboard
+            FEPY Dashboard
           </v-list-item-title>
         </v-list-item>
 
@@ -110,7 +110,7 @@
     </v-main>
 
     <v-footer app>
-      <span>&copy; {{ new Date().getFullYear() }} Sistema de Facturación Electrónica - SIFEN</span>
+      <span>&copy; {{ new Date().getFullYear() }} FEPY</span>
     </v-footer>
 
     <v-snackbar v-model="snackbar" :color="snackbarColor" :timeout="3000">
@@ -151,6 +151,9 @@ export default {
 
     // Estado de autenticación
     const autenticado = ref(false);
+
+    // Computed para verificar si es página de login
+    const isLoginPage = computed(() => route.path === '/login');
 
     // Cargar información del usuario
     const cargarUsuario = () => {
@@ -207,6 +210,7 @@ export default {
       menu,
       usuario,
       autenticado,
+      isLoginPage,
       apiConnected,
       loadingApi,
       apiStatusColor,

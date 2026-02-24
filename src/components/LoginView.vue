@@ -4,9 +4,9 @@
       <v-card-title class="text-center">
         <h2 class="text-h4 font-weight-bold">
           <v-icon color="primary" size="large" class="mr-2">mdi-file-document-outline</v-icon>
-          SIFEN
+          FEPY
         </h2>
-        <p class="text-subtitle-1 mt-2">Sistema de Facturación Electrónica</p>
+        <p class="text-subtitle-1 mt-2">Facturación Electrónica Paraguay</p>
       </v-card-title>
 
       <v-card-text>
