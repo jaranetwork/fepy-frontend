@@ -461,9 +461,14 @@ export default {
     const cargarEmpresas = async () => {
       cargando.value = true;
       try {
-        const response = await axios.get('/api/empresas');
+        // Agregar timestamp para evitar cache
+        const response = await axios.get('/api/empresas', {
+          params: { _t: Date.now() }
+        });
         empresas.value = response.data.data || [];
+        console.log('✅ Empresas cargadas:', empresas.value.length);
       } catch (error) {
+        console.error('❌ Error cargando empresas:', error);
         mostrarSnackbar('Error cargando empresas: ' + error.message, 'error');
       } finally {
         cargando.value = false;
