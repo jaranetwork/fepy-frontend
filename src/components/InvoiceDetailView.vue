@@ -270,10 +270,10 @@ export default {
         const token = localStorage.getItem('token');
         console.log('🔑 Token en localStorage:', token ? 'Existe' : 'No existe');
         console.log('📋 Cargando factura ID:', route.params.id);
-        
+
         const response = await axios.get(`/api/invoices/${route.params.id}`);
         console.log('✅ Respuesta de factura:', response.data);
-        invoice.value = response.data;
+        invoice.value = response.data.data;  // ← Los datos están en response.data.data
       } catch (error) {
         console.error('❌ Error cargando factura:', error);
         console.error('Detalles:', error.response?.data);
