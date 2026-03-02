@@ -5,6 +5,7 @@ Proyecto frontend del sistema de facturación electrónica para Paraguay (SIFEN)
 ## 📋 Descripción
 
 Interfaz de usuario moderna y responsiva para gestionar facturas electrónicas, empresas, y monitorear el procesamiento en tiempo real.
+![fepy-1](https://github.com/user-attachments/assets/0540442a-be7e-4b38-b00e-877b1106c685)
 
 **Características principales:**
 - ✅ Dashboard con estadísticas en tiempo real
