@@ -15,6 +15,111 @@
       </template>
     </v-snackbar>
 
+    <!-- Diálogo de Confirmación para Limpiar BD -->
+    <v-dialog v-model="clearDialog" max-width="450" persistent>
+      <v-card>
+        <v-card-title class="text-h5 d-flex align-center bg-error text-white">
+          <v-icon start>mdi-database-remove</v-icon>
+          Eliminar TODAS las Facturas
+          <v-spacer></v-spacer>
+          <v-btn
+            icon="mdi-close"
+            size="small"
+            variant="text"
+            @click="clearDialog = false"
+            :disabled="clearing"
+            color="white"
+          ></v-btn>
+        </v-card-title>
+        <v-card-text class="mt-4">
+          <v-alert type="warning" variant="tonal" icon="mdi-alert" class="mb-3">
+            <strong>⚠️ Advertencia:</strong> Esta acción eliminará permanentemente todas las facturas de la base de datos.
+          </v-alert>
+          <p class="text-body-1">
+            ¿Estás <strong>SEGURO</strong> de que deseas continuar?
+          </p>
+          <p class="text-body-2 text-medium-emphasis">
+            Esta acción <strong>no se puede deshacer</strong>. Se eliminarán:
+          </p>
+          <ul class="text-body-2 text-medium-emphasis">
+            <li>Todas las facturas registradas</li>
+            <li>Los logs de operaciones asociados</li>
+            <li>Las referencias a archivos XML y PDF</li>
+          </ul>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn
+            color="grey"
+            variant="text"
+            @click="clearDialog = false"
+            :disabled="clearing"
+          >
+            Cancelar
+          </v-btn>
+          <v-btn
+            color="error"
+            variant="tonal"
+            @click="executeClearDatabase"
+            :loading="clearing"
+          >
+            <v-icon start>mdi-delete-forever</v-icon>
+            Eliminar Todo
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Diálogo de Confirmación para Reintentar Factura -->
+    <v-dialog v-model="retryDialog" max-width="400" persistent>
+      <v-card>
+        <v-card-title class="text-h5 d-flex align-center bg-warning text-white">
+          <v-icon start>mdi-reload</v-icon>
+          Reintentar Envío
+          <v-spacer></v-spacer>
+          <v-btn
+            icon="mdi-close"
+            size="small"
+            variant="text"
+            @click="retryDialog = false"
+            :disabled="retrying"
+            color="white"
+          ></v-btn>
+        </v-card-title>
+        <v-card-text class="mt-4">
+          <p class="text-body-1 mb-2">
+            ¿Estás seguro de reintentar el envío de esta factura?
+          </p>
+          <v-alert type="info" variant="tonal" icon="mdi-information" class="mb-2">
+            <strong>Factura:</strong> {{ retryInvoiceData?.correlativo }}
+          </v-alert>
+          <p class="text-body-2 text-medium-emphasis">
+            El sistema volverá a enviar el XML a SIFEN para actualizar el estado.
+          </p>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn
+            color="grey"
+            variant="text"
+            @click="retryDialog = false"
+            :disabled="retrying"
+          >
+            Cancelar
+          </v-btn>
+          <v-btn
+            color="warning"
+            variant="tonal"
+            @click="executeRetryInvoice"
+            :loading="retrying"
+          >
+            <v-icon start>mdi-reload</v-icon>
+            Reintentar
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-card>
       <v-card-title class="d-flex align-center flex-wrap">
         <h2>Lista de Facturas</h2>
@@ -90,20 +195,17 @@
             <span class="font-weight-medium">{{ item.cliente?.ruc || '-' }}</span>
           </template>
 
+          <template v-slot:item.cdc="{ item }">
+            <span class="text-mono text-caption">{{ item.cdc || '-' }}</span>
+          </template>
+
           <template v-slot:item.estadoSifen="{ item }">
             <v-chip
-              :color="getStatusColor(item.estadoSifen)"
+              :color="getEstadoVisualColor(item.estadoVisual || item.estadoSifen)"
               variant="flat"
             >
               {{ item.estadoSifen }}
             </v-chip>
-          </template>
-
-          <template v-slot:item.cdc="{ item }">
-            <span v-if="item.cdc" :title="item.cdc">
-              {{ item.cdc?.substring(0, 10) }}...
-            </span>
-            <span v-else class="text-grey">-</span>
           </template>
 
           <template v-slot:item.total="{ item }">
@@ -115,56 +217,56 @@
           </template>
           
           <template v-slot:item.actions="{ item }">
-            <v-btn
-              color="success"
-              size="small"
-              variant="text"
-              @click="downloadXml(item)"
-              :disabled="!item.xmlPath"
-              title="Descargar XML"
-            >
-              <v-icon>mdi-file-xml-box</v-icon>
-            </v-btn>
-            <v-btn
-              color="accent"
-              size="small"
-              variant="text"
-              @click="downloadPdf(item)"
-              :disabled="!item.kudePath"
-              title="Descargar PDF"
-            >
-              <v-icon>mdi-file-pdf-box</v-icon>
-            </v-btn>
-            <v-btn
-              color="info"
-              size="small"
-              variant="text"
-              @click="refreshInvoiceStatus(item)"
-              :loading="item.refreshing"
-              title="Consultar Estado"
-            >
-              <v-icon>mdi-refresh</v-icon>
-            </v-btn>
-            <v-btn
-              color="primary"
-              size="small"
-              variant="text"
-              @click="viewInvoice(item._id)"
-              title="Ver Detalle"
-            >
-              <v-icon>mdi-eye</v-icon>
-            </v-btn>
-
-            <v-btn
-              v-if="item.estadoSifen === 'error'"
-              color="warning"
-              size="small"
-              variant="text"
-              @click="retryInvoice(item._id)"
-              title="Reintentar"
-            >
-              <v-icon>mdi-reload</v-icon>
-            </v-btn>
+            <v-menu v-model="item.menuOpen" :close-on-content-click="false" location="start">
+              <template v-slot:activator="{ props }">
+                <v-btn
+                  color="primary"
+                  size="small"
+                  variant="tonal"
+                  v-bind="props"
+                  title="Acciones"
+                >
+                  <v-icon>mdi-dots-vertical</v-icon>
+                </v-btn>
+              </template>
+              <v-list density="compact" min-width="200">
+                <v-list-item @click="downloadXml(item); item.menuOpen = false" :disabled="!item.xmlPath">
+                  <template v-slot:prepend>
+                    <v-icon color="success" size="small">mdi-file-xml-box</v-icon>
+                  </template>
+                  <v-list-item-title>Descargar XML</v-list-item-title>
+                </v-list-item>
+                <v-list-item @click="downloadPdf(item); item.menuOpen = false" :disabled="!item.kudePath">
+                  <template v-slot:prepend>
+                    <v-icon color="error" size="small">mdi-file-pdf-box</v-icon>
+                  </template>
+                  <v-list-item-title>Descargar PDF</v-list-item-title>
+                </v-list-item>
+                <v-divider></v-divider>
+                <v-list-item @click="refreshInvoiceStatus(item); item.menuOpen = false">
+                  <template v-slot:prepend>
+                    <v-icon color="info" size="small">mdi-refresh</v-icon>
+                  </template>
+                  <v-list-item-title>Consultar Estado</v-list-item-title>
+                </v-list-item>
+                <v-list-item @click="viewInvoice(item._id); item.menuOpen = false">
+                  <template v-slot:prepend>
+                    <v-icon color="primary" size="small">mdi-eye</v-icon>
+                  </template>
+                  <v-list-item-title>Ver Detalle</v-list-item-title>
+                </v-list-item>
+                <v-divider></v-divider>
+                <v-list-item
+                  v-if="item.estadoSifen === 'error'"
+                  @click="confirmRetryInvoice(item); item.menuOpen = false"
+                >
+                  <template v-slot:prepend>
+                    <v-icon color="warning" size="small">mdi-reload</v-icon>
+                  </template>
+                  <v-list-item-title class="text-warning">Reintentar</v-list-item-title>
+                </v-list-item>
+              </v-list>
+            </v-menu>
           </template>
         </v-data-table>
         
@@ -198,6 +300,11 @@ export default {
     const statusSnackbarText = ref('');
     const statusSnackbarColor = ref('info');
     const statusSnackbarIcon = ref('mdi-information');
+    const clearDialog = ref(false);
+    const retryDialog = ref(false);
+    const retrying = ref(false);
+    const retryInvoiceData = ref(null);
+    const clearing = ref(false);
 
     const searchTypes = [
       { title: 'RUC', value: 'ruc' },
@@ -215,14 +322,14 @@ export default {
       if (!search.value) {
         return invoices.value;
       }
-      
+
       const searchLower = search.value.toLowerCase();
-      
+
       return invoices.value.filter(invoice => {
         const ruc = (invoice.cliente?.ruc || '').toLowerCase();
         const nombre = (invoice.cliente?.nombre || '').toLowerCase();
         const cdc = (invoice.cdc || '').toLowerCase();
-        
+
         // Filtrar según el tipo de búsqueda seleccionado
         switch (searchType.value) {
           case 'ruc':
@@ -247,7 +354,7 @@ export default {
       { title: 'Fecha', key: 'createdAt' },
       { title: 'Acciones', key: 'actions', sortable: false }
     ];
-    
+
     const getStatusColor = (status) => {
       switch(status) {
         case 'enviado':
@@ -258,6 +365,23 @@ export default {
         case 'error':
         case 'rechazado':
           return 'error';
+        default:
+          return 'info';
+      }
+    };
+
+    // Nueva función para estado visual (según código de retorno SIFEN v150)
+    // 0260 = Verde (Aceptado)
+    // 1005, 0000 = Amarillo medio oscuro (Observado)
+    // Otros = Rojo (Rechazado)
+    const getEstadoVisualColor = (estadoVisual) => {
+      switch(estadoVisual) {
+        case 'aceptado':
+          return 'success';  // Verde
+        case 'observado':
+          return 'amber';    // Amarillo medio oscuro (transmisión extemporánea / en procesamiento)
+        case 'rechazado':
+          return 'error';    // Rojo
         default:
           return 'info';
       }
@@ -359,6 +483,9 @@ export default {
     const refreshInvoiceStatus = async (invoice) => {
       invoice.refreshing = true;
       try {
+        // Registrar el inicio de la consulta en consola (el backend guardará el log en BD)
+        console.log(`📋 Consultando estado de factura: ${invoice.correlativo} (ID: ${invoice._id})`);
+        
         const response = await axios.post(`/api/invoices/${invoice._id}/refresh-status`);
         
         if (response.data.estadoCambio) {
@@ -405,44 +532,95 @@ export default {
           statusSnackbar.value = true;
         }
       } catch (error) {
-        statusSnackbarText.value = `❌ Error al consultar ${invoice.correlativo}`;
+        console.error('Error al consultar estado:', error);
+        
+        // Determinar el mensaje de error según el tipo de error
+        let errorMessage = `❌ Error al consultar ${invoice.correlativo}`;
+        
+        if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+          errorMessage = `⏱️ Timeout: El servidor no respondió a tiempo`;
+        } else if (error.response?.status === 500) {
+          // Error del servidor (ej: SET no responde)
+          const backendError = error.response?.data;
+          if (backendError?.message?.includes('SET')) {
+            errorMessage = `🔌 Error de conexión con SET: ${backendError.message}`;
+          } else {
+            errorMessage = `❌ Error del servidor: ${backendError?.message || error.message}`;
+          }
+        } else if (!error.response && error.request) {
+          // La solicitud se envió pero no se recibió respuesta
+          errorMessage = `🔌 Sin respuesta del servidor. Verifique que el backend esté en ejecución.`;
+        } else if (error.message) {
+          errorMessage = `❌ Error: ${error.message}`;
+        }
+        
+        statusSnackbarText.value = errorMessage;
         statusSnackbarColor.value = 'error';
         statusSnackbarIcon.value = 'mdi-alert-circle';
         statusSnackbar.value = true;
+        
+        // Recargar la lista para mostrar el estado actualizado (posiblemente 'error')
+        loadInvoices();
       } finally {
         invoice.refreshing = false;
       }
     };
 
     const confirmClearDatabase = () => {
-      if (confirm('⚠️ ¿Está SEGURO de que desea eliminar TODAS las facturas de la base de datos?\n\nEsta acción NO se puede deshacer.')) {
-        if (confirm('⚠️ ¿Realmente desea continuar? Esto eliminará todos los registros.')) {
-          clearDatabase();
-        }
-      }
+      clearDialog.value = true;
     };
 
-    const clearDatabase = async () => {
+    const executeClearDatabase = async () => {
+      clearing.value = true;
       try {
         const response = await axios.delete('/api/invoices/clear');
-        alert('✅ ' + response.data.message + `\n${response.data.deletedCount} facturas eliminadas.`);
+
+        statusSnackbarText.value = `✅ ${response.data.message}`;
+        statusSnackbarColor.value = 'success';
+        statusSnackbarIcon.value = 'mdi-check-circle';
+        statusSnackbar.value = true;
+
+        clearDialog.value = false;
         loadInvoices();
       } catch (error) {
         console.error('Error limpiando base de datos:', error);
-        alert('❌ Error al limpiar la base de datos: ' + (error.response?.data?.message || error.message));
+        statusSnackbarText.value = `❌ Error al limpiar la base de datos: ${error.response?.data?.message || error.message}`;
+        statusSnackbarColor.value = 'error';
+        statusSnackbarIcon.value = 'mdi-alert-circle';
+        statusSnackbar.value = true;
+      } finally {
+        clearing.value = false;
       }
     };
 
-    const retryInvoice = async (id) => {
-      if (confirm('¿Está seguro de reintentar el envío de esta factura?')) {
-        try {
-          await axios.post(`/api/invoices/${id}/retry`);
-          alert('Reintento de envío iniciado');
-          loadInvoices();
-        } catch (error) {
-          console.error('Error reintentando factura:', error);
-          alert('Hubo un error al reintentar el envío');
-        }
+    const confirmRetryInvoice = (invoice) => {
+      retryInvoiceData.value = invoice;
+      retryDialog.value = true;
+    };
+
+    const executeRetryInvoice = async () => {
+      if (!retryInvoiceData.value) return;
+      
+      retrying.value = true;
+      try {
+        await axios.post(`/api/invoices/${retryInvoiceData.value._id}/retry`);
+        statusSnackbarText.value = `✅ Reintento de envío iniciado: ${retryInvoiceData.value.correlativo}`;
+        statusSnackbarColor.value = 'success';
+        statusSnackbarIcon.value = 'mdi-check-circle';
+        statusSnackbar.value = true;
+        retryDialog.value = false;
+        retryInvoiceData.value = null;
+        loadInvoices();
+      } catch (error) {
+        console.error('Error reintentando factura:', error);
+        statusSnackbarText.value = `❌ Error al reintentar el envío: ${retryInvoiceData.value.correlativo}`;
+        statusSnackbarColor.value = 'error';
+        statusSnackbarIcon.value = 'mdi-alert-circle';
+        statusSnackbar.value = true;
+        retryDialog.value = false;
+        retryInvoiceData.value = null;
+      } finally {
+        retrying.value = false;
       }
     };
 
@@ -482,15 +660,23 @@ export default {
       totalItems,
       headers,
       getStatusColor,
+      getEstadoVisualColor,
       formatCurrency,
       formatDate,
       viewInvoice,
       downloadXml,
       downloadPdf,
       refreshInvoiceStatus,
-      retryInvoice,
+      confirmRetryInvoice,
+      executeRetryInvoice,
       changePage,
       confirmClearDatabase,
+      executeClearDatabase,
+      clearDialog,
+      retryDialog,
+      retrying,
+      retryInvoiceData,
+      clearing,
       statusSnackbar,
       statusSnackbarText,
       statusSnackbarColor,

@@ -91,7 +91,7 @@
 
         <v-list-item link to="/queue-status" :active="route.path === '/queue-status'">
           <template v-slot:prepend>
-            <v-icon>mdi-view-queue</v-icon>
+            <v-icon>mdi-clipboard-list-outline</v-icon>
           </template>
           <v-list-item-title>Cola de Procesos</v-list-item-title>
         </v-list-item>

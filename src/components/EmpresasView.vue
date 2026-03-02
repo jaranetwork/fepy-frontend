@@ -246,7 +246,19 @@
                     ></v-select>
                   </v-col>
 
-                  <v-col cols="12" md="6"></v-col>
+                  <v-col cols="12">
+                    <v-text-field
+                      v-model="formulario.configuracionSifen.urlLogo"
+                      label="URL del Logo"
+                      placeholder="https://miempresa.com/logo.png"
+                      hint="URL de la imagen del logo de la empresa para el KUDE"
+                      persistent-hint
+                      outlined
+                    ></v-text-field>
+                    <div class="text-caption text-grey mt-1">
+                      ℹ️ Esta imagen se mostrará en el PDF del KUDE (Documento Electrónico).
+                    </div>
+                  </v-col>
 
                   <v-col cols="12">
                     <v-text-field
@@ -348,31 +360,61 @@
     </v-dialog>
 
     <!-- Diálogo: Confirmar eliminación -->
-    <v-dialog v-model="mostrarDialogoEliminar" max-width="500px" persistent>
+    <v-dialog v-model="mostrarDialogoEliminar" max-width="450" persistent>
       <v-card>
-        <v-card-title class="bg-error text-white">
-          <v-icon start>mdi-alert</v-icon>
-          Confirmar Eliminación
+        <v-card-title class="text-h5 d-flex align-center bg-error text-white">
+          <v-icon start>mdi-delete-forever</v-icon>
+          Eliminar Empresa
+          <v-spacer></v-spacer>
+          <v-btn
+            icon="mdi-close"
+            size="small"
+            variant="text"
+            @click="mostrarDialogoEliminar = false"
+            :disabled="eliminando"
+            color="white"
+          ></v-btn>
         </v-card-title>
-
         <v-card-text class="mt-4">
-          <p>¿Está seguro que desea eliminar la empresa <strong>{{ empresaSeleccionada?.nombreFantasia }}</strong>?</p>
-          <v-alert
-            v-if="empresaSeleccionada"
-            type="warning"
-            variant="tonal"
-            class="mt-4"
-          >
-            <v-icon start>mdi-alert</v-icon>
-            Esta acción no se puede deshacer. Asegúrese de que no haya facturas asociadas.
+          <v-alert type="warning" variant="tonal" icon="mdi-alert" class="mb-3">
+            <strong>⚠️ Advertencia:</strong> Esta acción eliminará permanentemente la empresa.
           </v-alert>
+          <p class="text-body-1 mb-2">
+            ¿Estás <strong>SEGURO</strong> de que deseas eliminar la empresa?
+          </p>
+          <v-card variant="outlined" class="pa-3 mb-3">
+            <div class="text-subtitle-1 font-weight-bold">{{ empresaSeleccionada?.nombreFantasia }}</div>
+            <div class="text-caption text-medium-emphasis">
+              <v-icon start size="x-small">mdi-numeric</v-icon> RUC: {{ empresaSeleccionada?.ruc }}<br>
+              <v-icon start size="x-small">mdi-account</v-icon> {{ empresaSeleccionada?.razonSocial }}
+            </div>
+          </v-card>
+          <p class="text-body-2 text-medium-emphasis">
+            Esta acción <strong>no se puede deshacer</strong>. Se eliminarán:
+          </p>
+          <ul class="text-body-2 text-medium-emphasis">
+            <li>La empresa y su configuración</li>
+            <li>El certificado digital asociado</li>
+            <li>Las referencias a configuraciones SIFEN</li>
+          </ul>
         </v-card-text>
-
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn text @click="mostrarDialogoEliminar = false">Cancelar</v-btn>
-          <v-btn color="error" :loading="eliminando" @click="eliminarEmpresa">
-            <v-icon start>mdi-delete</v-icon>
+          <v-btn
+            color="grey"
+            variant="text"
+            @click="mostrarDialogoEliminar = false"
+            :disabled="eliminando"
+          >
+            Cancelar
+          </v-btn>
+          <v-btn
+            color="error"
+            variant="tonal"
+            @click="eliminarEmpresa"
+            :loading="eliminando"
+          >
+            <v-icon start>mdi-delete-forever</v-icon>
             Eliminar
           </v-btn>
         </v-card-actions>
@@ -425,10 +467,11 @@ export default {
       telefono: '',
       email: '',
       configuracionSifen: {
-        codigoEstablecimiento: '001',
-        codigoPuntoEmision: '001',
-        numeroTimbrado: '12345678',
-        modo: 'test'
+        timbrado: '12345678',
+        idCSC: '0001',
+        csc: '',
+        modo: 'test',
+        urlLogo: ''
       }
     });
     
@@ -496,7 +539,8 @@ export default {
           timbrado: '12345678',
           idCSC: '0001',
           csc: '',
-          modo: 'test'
+          modo: 'test',
+          urlLogo: ''
         }
       };
       mostrarDialogoFormulario.value = true;
@@ -516,7 +560,8 @@ export default {
           timbrado: empresa.configuracionSifen?.timbrado || '12345678',
           idCSC: empresa.configuracionSifen?.idCSC || '0001',
           csc: empresa.configuracionSifen?.csc || '',
-          modo: empresa.configuracionSifen?.modo || 'test'
+          modo: empresa.configuracionSifen?.modo || 'test',
+          urlLogo: empresa.configuracionSifen?.urlLogo || ''
         }
       };
       mostrarDialogoFormulario.value = true;

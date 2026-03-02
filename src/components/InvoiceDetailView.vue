@@ -60,10 +60,18 @@
                     <p v-if="invoice.fechaEnvio"><strong>Fecha de Envío:</strong> {{ formatDate(invoice.fechaEnvio) }}</p>
                     <p v-if="invoice.fechaProceso"><strong>Fecha de Proceso:</strong> {{ formatDateTime(invoice.fechaProceso) }}</p>
                     <p><strong>Estado en SIFEN:</strong> {{ invoice.estadoSifen }}</p>
-                    <p v-if="invoice.cdc"><strong>CDC:</strong> {{ invoice.cdc }}</p>
+                    <p v-if="invoice.cdc"><strong>CDC:</strong> <span class="text-mono">{{ invoice.cdc }}</span></p>
                     <p v-if="invoice.codigoRetorno"><strong>Código de Retorno:</strong> {{ invoice.codigoRetorno }}</p>
                     <p v-if="invoice.mensajeRetorno"><strong>Mensaje:</strong> {{ invoice.mensajeRetorno }}</p>
-                    <p v-if="invoice.digestValue"><strong>Digest Value:</strong> {{ invoice.digestValue?.substring(0, 20) }}...</p>
+                    <p>
+                      <strong>Digest Value:</strong>
+                      <span v-if="invoice.digestValue" class="text-mono text-caption d-block mt-1" style="word-break: break-all;">
+                        {{ invoice.digestValue }}
+                      </span>
+                      <span v-else class="text-caption text-grey">
+                        No disponible
+                      </span>
+                    </p>
                   </v-card-text>
                 </v-card>
               </v-col>
@@ -150,7 +158,7 @@
                     >
                       <template v-slot:item.tipoOperacion="{ item }">
                         <v-chip
-                          :color="getLogStatusColor(item.tipoOperacion)"
+                          :color="getLogStatusColor(item.tipoOperacion, item.estado)"
                           size="small"
                           variant="flat"
                         >
@@ -223,7 +231,15 @@ export default {
       }
     };
     
-    const getLogStatusColor = (tipo) => {
+    const getLogStatusColor = (tipo, estado) => {
+      // Si el estado es error, mostrar en rojo independientemente del tipo
+      if (estado === 'error') {
+        return 'error';
+      }
+      if (estado === 'warning') {
+        return 'warning';
+      }
+      
       switch(tipo) {
         case 'envio_exitoso':
         case 'inicio_proceso':
@@ -274,6 +290,10 @@ export default {
         const response = await axios.get(`/api/invoices/${route.params.id}`);
         console.log('✅ Respuesta de factura:', response.data);
         invoice.value = response.data.data;  // ← Los datos están en response.data.data
+        
+        // Debug: Verificar digestValue
+        console.log('🔐 DigestValue recibido:', invoice.value.digestValue || 'NO DISPONIBLE');
+        console.log('📋 Todos los campos de la factura:', Object.keys(invoice.value));
       } catch (error) {
         console.error('❌ Error cargando factura:', error);
         console.error('Detalles:', error.response?.data);
@@ -469,3 +489,9 @@ export default {
   }
 };
 </script>
+
+<style scoped>
+.text-mono {
+  font-family: 'Courier New', Courier, monospace;
+}
+</style>

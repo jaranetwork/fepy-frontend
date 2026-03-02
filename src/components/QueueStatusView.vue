@@ -67,11 +67,14 @@
             <v-row>
               <v-col cols="12" sm="6">
                 <v-alert
-                  :type="workerStatus === 'active' ? 'success' : 'warning'"
+                  :type="workerStatus === 'active' ? 'success' : 'error'"
                   variant="tonal"
                   :icon="workerStatus === 'active' ? 'mdi-check-circle' : 'mdi-alert-circle'"
                 >
                   <strong>Worker:</strong> {{ workerStatus === 'active' ? 'En línea' : 'Desconectado' }}
+                  <span v-if="workerStatus === 'active'" class="text-caption d-block mt-1">
+                    <strong>Jobs activos:</strong> {{ queueStats.facturacion?.active || 0 }}
+                  </span>
                 </v-alert>
               </v-col>
               <v-col cols="12" sm="6">
@@ -85,14 +88,50 @@
       </v-col>
     </v-row>
 
-    <!-- Lista de Facturas Recientes -->
+    <!-- Lista de Jobs Recientes -->
     <v-row>
       <v-col cols="12">
         <v-card variant="outlined">
           <v-card-title class="bg-grey-lighten-5 d-flex align-center">
             <v-icon start color="primary">mdi-receipt-text-outline</v-icon>
-            Facturas Recientes
+            Jobs Recientes
             <v-spacer></v-spacer>
+            <v-menu v-model="menu" :close-on-content-click="false" location="start">
+              <template v-slot:activator="{ props }">
+                <v-btn
+                  color="error"
+                  variant="tonal"
+                  size="small"
+                  v-bind="props"
+                  :loading="clearing"
+                  class="mr-2"
+                >
+                  <v-icon start>mdi-delete-forever</v-icon>
+                  Limpiar
+                  <v-icon end>mdi-menu-down</v-icon>
+                </v-btn>
+              </template>
+              <v-list density="compact">
+                <v-list-item @click="clearJobs('completed')">
+                  <template v-slot:prepend>
+                    <v-icon color="success">mdi-check-circle</v-icon>
+                  </template>
+                  <v-list-item-title>Completados</v-list-item-title>
+                </v-list-item>
+                <v-list-item @click="clearJobs('failed')">
+                  <template v-slot:prepend>
+                    <v-icon color="error">mdi-alert-circle</v-icon>
+                  </template>
+                  <v-list-item-title>Fallidos</v-list-item-title>
+                </v-list-item>
+                <v-list-item @click="clearJobs('all')">
+                  <template v-slot:prepend>
+                    <v-icon color="error">mdi-delete-forever</v-icon>
+                  </template>
+                  <v-list-item-title>Todos</v-list-item-title>
+                </v-list-item>
+              </v-list>
+            </v-menu>
             <v-btn
               icon="mdi-refresh"
               variant="text"
@@ -105,116 +144,116 @@
           <v-card-text>
             <v-data-table
               :headers="headers"
-              :items="facturas"
+              :items="jobs"
               :loading="loading"
-              loading-text="Cargando facturas..."
+              loading-text="Cargando jobs..."
               class="elevation-0"
               hide-default-footer
-              :items-per-page="10"
+              :items-per-page="20"
             >
               <!-- Estado -->
-              <template v-slot:item.estadoSifen="{ item }">
+              <template v-slot:item.estado="{ item }">
                 <v-chip
-                  :color="getEstadoColor(item.estadoSifen)"
+                  :color="getJobEstadoColor(item.estado)"
                   size="small"
                   label
                 >
-                  <v-icon start size="small">{{ getEstadoIcon(item.estadoSifen) }}</v-icon>
-                  {{ item.estadoSifen }}
+                  <v-icon start size="small">{{ getJobEstadoIcon(item.estado) }}</v-icon>
+                  {{ formatJobEstado(item.estado) }}
                 </v-chip>
               </template>
 
-              <!-- CDC -->
-              <template v-slot:item.cdc="{ item }">
-                <span class="text-mono text-caption">
-                  {{ item.cdc || '---' }}
-                </span>
-              </template>
-
-              <!-- Total -->
-              <template v-slot:item.total="{ item }">
-                <strong>{{ formatCurrency(item.total) }}</strong>
-              </template>
-
-              <!-- Fecha -->
-              <template v-slot:item.fechaCreacion="{ item }">
-                {{ formatDate(item.fechaCreacion) }}
-              </template>
-
-              <!-- Acciones -->
-              <template v-slot:item.actions="{ item }">
-                <v-btn
-                  icon="mdi-eye"
-                  variant="text"
+              <!-- Cola -->
+              <template v-slot:item.queue="{ item }">
+                <v-chip
+                  :color="item.queue === 'facturacion' ? 'primary' : 'accent'"
                   size="small"
-                  @click="verDetalle(item)"
-                ></v-btn>
+                  variant="tonal"
+                >
+                  {{ item.queue }}
+                </v-chip>
+              </template>
+
+              <!-- Error -->
+              <template v-slot:item.error="{ item }">
+                <v-tooltip v-if="item.error" location="top">
+                  <template v-slot:activator="{ props }">
+                    <v-icon color="error" v-bind="props">mdi-alert-circle</v-icon>
+                  </template>
+                  <span>{{ item.error }}</span>
+                </v-tooltip>
+                <span v-else class="text-medium-emphasis">—</span>
+              </template>
+
+              <!-- Intentos -->
+              <template v-slot:item.attempts="{ item }">
+                <v-chip
+                  :color="item.attempts > 1 ? 'warning' : 'success'"
+                  size="x-small"
+                  variant="tonal"
+                >
+                  {{ item.attempts }}
+                </v-chip>
+              </template>
+
+              <!-- Timestamp -->
+              <template v-slot:item.timestamp="{ item }">
+                {{ formatTimestamp(item.timestamp) }}
               </template>
             </v-data-table>
 
             <v-empty-state
-              v-if="!loading && facturas.length === 0"
-              title="No hay facturas"
-              text="Las facturas procesadas aparecerán aquí"
+              v-if="!loading && jobs.length === 0"
+              title="No hay jobs recientes"
+              text="Los jobs procesados aparecerán aquí"
               icon="mdi-inbox-outline"
             ></v-empty-state>
           </v-card-text>
         </v-card>
       </v-col>
     </v-row>
-
-    <!-- Diálogo de Detalle -->
-    <v-dialog v-model="dialog" max-width="800">
-      <v-card>
-        <v-card-title class="bg-primary">
-          <v-icon start color="white">mdi-information-outline</v-icon>
-          Detalle de Factura
-        </v-card-title>
-        <v-card-text class="pa-4">
-          <v-row v-if="selectedFactura">
-            <v-col cols="12" sm="6">
-              <strong>Correlativo:</strong><br>
-              {{ selectedFactura.correlativo }}
-            </v-col>
-            <v-col cols="12" sm="6">
-              <strong>Estado:</strong><br>
-              <v-chip :color="getEstadoColor(selectedFactura.estadoSifen)" size="small">
-                {{ selectedFactura.estadoSifen }}
-              </v-chip>
-            </v-col>
-            <v-col cols="12" sm="6">
-              <strong>CDC:</strong><br>
-              <span class="text-mono text-caption">{{ selectedFactura.cdc || '---' }}</span>
-            </v-col>
-            <v-col cols="12" sm="6">
-              <strong>Cliente:</strong><br>
-              {{ selectedFactura.cliente?.razonSocial || selectedFactura.cliente?.nombre || 'N/A' }}
-            </v-col>
-            <v-col cols="12" sm="6">
-              <strong>Total:</strong><br>
-              {{ formatCurrency(selectedFactura.total) }}
-            </v-col>
-            <v-col cols="12" sm="6">
-              <strong>Fecha:</strong><br>
-              {{ formatDate(selectedFactura.fechaCreacion) }}
-            </v-col>
-            <v-col cols="12" v-if="selectedFactura.codigoRetorno">
-              <strong>Código de Retorno:</strong><br>
-              <code>{{ selectedFactura.codigoRetorno }}</code>
-            </v-col>
-            <v-col cols="12" v-if="selectedFactura.mensajeRetorno">
-              <strong>Mensaje:</strong><br>
-              {{ selectedFactura.mensajeRetorno }}
-            </v-col>
-          </v-row>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn color="primary" @click="dialog = false">Cerrar</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
   </v-container>
+
+  <!-- Diálogo de Confirmación -->
+  <v-dialog v-model="dialog" max-width="400" persistent>
+    <v-card>
+      <v-card-title class="text-h5 d-flex align-center" :class="dialogType === 'all' ? 'bg-error text-white' : 'bg-warning text-black'">
+        <v-icon start>{{ dialogType === 'all' ? 'mdi-alert' : 'mdi-delete-sweep' }}</v-icon>
+        {{ getDialogOption(dialogType)?.title }}
+        <v-spacer></v-spacer>
+        <v-btn
+          icon="mdi-close"
+          size="small"
+          variant="text"
+          @click="dialog = false"
+          :disabled="clearing"
+          :color="dialogType === 'all' ? 'white' : 'black'"
+        ></v-btn>
+      </v-card-title>
+      <v-card-text class="mt-4">
+        {{ getDialogOption(dialogType)?.text }}
+      </v-card-text>
+      <v-card-actions>
+        <v-spacer></v-spacer>
+        <v-btn
+          color="grey"
+          variant="text"
+          @click="dialog = false"
+          :disabled="clearing"
+        >
+          Cancelar
+        </v-btn>
+        <v-btn
+          :color="dialogType === 'all' ? 'error' : 'warning'"
+          variant="tonal"
+          @click="executeClear"
+          :loading="clearing"
+        >
+          Eliminar
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <script>
@@ -226,24 +265,27 @@ export default {
   data() {
     return {
       loading: false,
+      clearing: false,
+      menu: false,
       dialog: false,
-      selectedFactura: null,
+      dialogType: null,
       queueStats: {
         facturacion: {},
         kude: {}
       },
-      facturas: [],
+      jobs: [],
       workerStatus: 'unknown',
       lastUpdate: '',
       refreshInterval: null,
       headers: [
+        { title: 'ID', key: 'id', sortable: true, align: 'center' },
+        { title: 'Cola', key: 'queue', sortable: true, align: 'center' },
+        { title: 'Estado', key: 'estado', sortable: true, align: 'center' },
         { title: 'Correlativo', key: 'correlativo', sortable: true },
-        { title: 'Estado', key: 'estadoSifen', sortable: true },
-        { title: 'CDC', key: 'cdc', sortable: false },
-        { title: 'Cliente', key: 'cliente.razonSocial', sortable: true },
-        { title: 'Total', key: 'total', sortable: true, align: 'right' },
-        { title: 'Fecha', key: 'fechaCreacion', sortable: true },
-        { title: 'Acciones', key: 'actions', sortable: false, align: 'center' }
+        { title: 'RUC', key: 'ruc', sortable: true },
+        { title: 'Intentos', key: 'attempts', sortable: true, align: 'center' },
+        { title: 'Error', key: 'error', sortable: false, align: 'center' },
+        { title: 'Fecha', key: 'timestamp', sortable: true }
       ]
     }
   },
@@ -267,15 +309,16 @@ export default {
         // Obtener estadísticas de la cola
         const statsResponse = await axios.get('/api/queue/stats')
         this.queueStats = statsResponse.data.data || {}
-        
-        // Obtener últimas facturas
-        const invoicesResponse = await axios.get('/api/invoices?limit=10')
-        this.facturas = invoicesResponse.data.data?.invoices || []
-        
-        // Verificar estado del worker (si hay jobs activos)
-        const activeJobs = this.queueStats.facturacion?.active || 0
-        this.workerStatus = activeJobs > 0 ? 'active' : 'idle'
-        
+
+        // Obtener jobs recientes
+        const jobsResponse = await axios.get('/api/queue/jobs?limit=20')
+        this.jobs = jobsResponse.data.data || []
+
+        // Verificar estado del worker
+        // El worker está "active" (en línea) si Redis está conectado
+        // No significa que haya jobs activos necesariamente
+        this.workerStatus = 'active'  // Asumimos que está conectado si llegamos acá
+
         this.lastUpdate = new Date().toLocaleTimeString()
       } catch (error) {
         console.error('Error al obtener datos:', error)
@@ -285,54 +328,105 @@ export default {
       }
     },
 
-    getEstadoColor(estado) {
+    getJobEstadoColor(estado) {
       const colors = {
-        'encolado': 'grey',
-        'procesando': 'info',
-        'enviado': 'warning',
-        'aceptado': 'success',
-        'rechazado': 'error',
-        'error': 'error'
+        'completed': 'success',
+        'failed': 'error',
+        'active': 'info',
+        'waiting': 'warning'
       }
       return colors[estado] || 'grey'
     },
 
-    getEstadoIcon(estado) {
+    getJobEstadoIcon(estado) {
       const icons = {
-        'encolado': 'mdi-clock-outline',
-        'procesando': 'mdi-cog-outline',
-        'enviado': 'mdi-send-outline',
-        'aceptado': 'mdi-check-circle',
-        'rechazado': 'mdi-close-circle',
-        'error': 'mdi-alert-circle'
+        'completed': 'mdi-check-circle',
+        'failed': 'mdi-alert-circle',
+        'active': 'mdi-cog-outline',
+        'waiting': 'mdi-clock-outline'
       }
       return icons[estado] || 'mdi-help-circle'
     },
 
-    formatCurrency(value) {
-      if (!value) return 'Gs. 0'
-      return new Intl.NumberFormat('es-PY', {
-        style: 'currency',
-        currency: 'PYG',
-        minimumFractionDigits: 0
-      }).format(value)
+    formatJobEstado(estado) {
+      const estados = {
+        'completed': 'Completado',
+        'failed': 'Fallido',
+        'active': 'Procesando',
+        'waiting': 'En Espera'
+      }
+      return estados[estado] || estado
     },
 
-    formatDate(dateString) {
-      if (!dateString) return '---'
-      const date = new Date(dateString)
+    formatTimestamp(timestamp) {
+      if (!timestamp) return '---'
+      const date = new Date(timestamp)
       return date.toLocaleString('es-PY', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
         hour: '2-digit',
-        minute: '2-digit'
+        minute: '2-digit',
+        second: '2-digit'
       })
     },
 
-    verDetalle(factura) {
-      this.selectedFactura = factura
+    getDialogOption(type) {
+      const options = {
+        completed: {
+          title: 'Limpiar Jobs Completados',
+          text: '¿Estás seguro de que deseas eliminar todos los jobs completados? Esta acción no se puede deshacer.',
+          endpoint: '/api/queue/clear-completed'
+        },
+        failed: {
+          title: 'Limpiar Jobs Fallidos',
+          text: '¿Estás seguro de que deseas eliminar todos los jobs fallidos? Esta acción no se puede deshacer.',
+          endpoint: '/api/queue/clear-failed'
+        },
+        all: {
+          title: 'Limpiar TODOS los Jobs',
+          text: '⚠️ ¿Estás SEGURO de que deseas eliminar TODOS los jobs (completados, fallidos, en espera y activos)? Esta acción no se puede deshacer.',
+          endpoint: '/api/queue/clear-all'
+        }
+      }
+      return options[type]
+    },
+
+    clearJobs(type) {
+      // Cerrar menú y abrir diálogo
+      this.menu = false
+      this.dialogType = type
       this.dialog = true
+    },
+
+    async executeClear() {
+      const option = this.getDialogOption(this.dialogType)
+      if (!option) return
+
+      try {
+        const response = await axios.post(option.endpoint, { queue: 'facturacion' })
+
+        this.$snackbar.show({
+          message: response.data.message,
+          color: 'success',
+          timeout: 3000
+        })
+
+        this.dialog = false
+        this.dialogType = null
+
+        // Recargar datos después de limpiar
+        await this.fetchData()
+      } catch (error) {
+        console.error('Error al limpiar jobs:', error)
+        this.$snackbar.show({
+          message: error.response?.data?.error || 'Error al limpiar jobs',
+          color: 'error',
+          timeout: 5000
+        })
+      } finally {
+        this.clearing = false
+      }
     }
   }
 }
