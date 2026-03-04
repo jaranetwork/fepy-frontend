@@ -238,7 +238,7 @@
                       v-model="formulario.configuracionSifen.modo"
                       label="Modo de Operación *"
                       :items="[
-                        { title: 'Test (Mock)', value: 'test' },
+                        { title: 'Test (SIFEN)', value: 'test' },
                         { title: 'Producción (SET Real)', value: 'produccion' }
                       ]"
                       :rules="[v => !!v || 'Modo requerido']"
