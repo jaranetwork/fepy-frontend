@@ -15,6 +15,7 @@ export default defineConfig({
     })
   ],
   server: {
+    host: '0.0.0.0',  // Permitir acceso desde otros equipos
     port: 3000,
     // Configurar proxy solo para /api/
     proxy: {
