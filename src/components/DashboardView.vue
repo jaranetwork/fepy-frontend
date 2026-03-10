@@ -73,10 +73,10 @@
 
               <template v-slot:item.estadoSifen="{ item }">
                 <v-chip
-                  :color="getStatusColor(item.estadoSifen)"
+                  :color="getStatusColor(item.estado)"
                   dark
                 >
-                  {{ item.estadoSifen }}
+                  {{ item.estado }}
                 </v-chip>
               </template>
               <template v-slot:item.createdAt="{ item }">
@@ -158,7 +158,7 @@ export default {
       { title: 'RUC', key: 'cliente.ruc' },
       { title: 'CDC', key: 'cdc' },
       { title: 'Cliente', key: 'cliente.nombre' },
-      { title: 'Estado', key: 'estadoSifen' },
+      { title: 'Estado', key: 'estado' },
       { title: 'Fecha', key: 'createdAt' },
       { title: 'Acciones', key: 'actions', sortable: false }
     ];

@@ -199,12 +199,12 @@
             <span class="text-mono text-caption">{{ item.cdc || '-' }}</span>
           </template>
 
-          <template v-slot:item.estadoSifen="{ item }">
+          <template v-slot:item.estado="{ item }">
             <v-chip
-              :color="getEstadoVisualColor(item.estadoVisual || item.estadoSifen)"
+              :color="getEstadoVisualColor(item.estadoVisual, item.codigoRetorno, item.estado)"
               variant="flat"
             >
-              {{ item.estadoSifen }}
+              {{ getEstadoVisualTexto(item.estadoVisual, item.codigoRetorno, item.estado) }}
             </v-chip>
           </template>
 
@@ -257,7 +257,7 @@
                 </v-list-item>
                 <v-divider></v-divider>
                 <v-list-item
-                  v-if="item.estadoSifen === 'error'"
+                  v-if="item.estado === 'error'"
                   @click="confirmRetryInvoice(item); item.menuOpen = false"
                 >
                   <template v-slot:prepend>
@@ -350,7 +350,7 @@ export default {
       { title: 'CDC', key: 'cdc' },
       { title: 'Cliente', key: 'cliente.nombre' },
       { title: 'Total', key: 'total' },
-      { title: 'Estado', key: 'estadoSifen' },
+      { title: 'Estado', key: 'estado' },
       { title: 'Fecha', key: 'createdAt' },
       { title: 'Acciones', key: 'actions', sortable: false }
     ];
@@ -370,21 +370,46 @@ export default {
       }
     };
 
-    // Nueva función para estado visual (según código de retorno SIFEN v150)
-    // 0260 = Verde (Aceptado)
-    // 1005, 0000 = Amarillo medio oscuro (Observado)
-    // Otros = Rojo (Rechazado)
-    const getEstadoVisualColor = (estadoVisual) => {
-      switch(estadoVisual) {
+    // Función para determinar el estado visual según código de retorno SIFEN v150
+    // Retorna: 'aceptado', 'observado', o 'rechazado'
+    const getEstadoVisual = (estadoVisual, codigoRetorno, estado) => {
+      // Si ya tenemos estadoVisual, usarlo directamente
+      if (estadoVisual) {
+        return estadoVisual;
+      }
+
+      // Si no hay estadoVisual, determinar por el estado SIFEN
+      // Estados que se muestran como aceptado (verde)
+      if (estado === 'aceptado' || estado === 'enviado') {
+        return 'aceptado';
+      }
+      // Estados que se muestran como observado (ámbar)
+      if (estado === 'observado' || estado === 'procesando') {
+        return 'observado';
+      }
+      // Todos los demás como rechazado (rojo)
+      return 'rechazado';
+    };
+
+    // Función para obtener el color del estado visual
+    const getEstadoVisualColor = (estadoVisual, codigoRetorno, estado) => {
+      const visual = getEstadoVisual(estadoVisual, codigoRetorno, estado);
+      switch(visual) {
         case 'aceptado':
           return 'success';  // Verde
         case 'observado':
-          return 'amber';    // Amarillo medio oscuro (transmisión extemporánea / en procesamiento)
+          return 'amber';    // Amarillo
         case 'rechazado':
           return 'error';    // Rojo
         default:
           return 'info';
       }
+    };
+
+    // Función para obtener el texto del estado visual
+    const getEstadoVisualTexto = (estadoVisual, codigoRetorno, estado) => {
+      const visual = getEstadoVisual(estadoVisual, codigoRetorno, estado);
+      return visual;
     };
 
     const formatCurrency = (amount) => {
@@ -485,9 +510,22 @@ export default {
       try {
         // Registrar el inicio de la consulta en consola (el backend guardará el log en BD)
         console.log(`📋 Consultando estado de factura: ${invoice.correlativo} (ID: ${invoice._id})`);
-        
+
         const response = await axios.post(`/api/invoices/${invoice._id}/refresh-status`);
-        
+
+        // Verificar si es estado final (no se consultó SET)
+        if (response.data.esEstadoFinal && !response.data.consultoSET) {
+          const estadoData = response.data.data;
+          const color = estadoData.estadoVisual === 'aceptado' ? 'success' :
+                        estadoData.estadoVisual === 'rechazado' ? 'error' : 'warning';
+          const icono = 'mdi-check-circle';
+          statusSnackbarText.value = `✅ ${invoice.correlativo}: Estado final (${estadoData.estado}) - No se consultó SET`;
+          statusSnackbarColor.value = color;
+          statusSnackbarIcon.value = icono;
+          statusSnackbar.value = true;
+          return;
+        }
+
         if (response.data.estadoCambio) {
           statusSnackbarText.value = `✅ ${invoice.correlativo}: ${response.data.estadoAnterior} → ${response.data.estadoActual}`;
           statusSnackbarColor.value = 'success';
@@ -500,7 +538,7 @@ export default {
           let mensajeEstado = '';
           let color = 'info';
           let icono = 'mdi-information';
-          
+
           switch(estadoActual) {
             case 'procesando':
               mensajeEstado = `⏳ ${invoice.correlativo}: Procesando en SIFEN`;
@@ -525,7 +563,7 @@ export default {
             default:
               mensajeEstado = `ℹ️ ${invoice.correlativo}: ${estadoActual}`;
           }
-          
+
           statusSnackbarText.value = mensajeEstado;
           statusSnackbarColor.value = color;
           statusSnackbarIcon.value = icono;
@@ -533,10 +571,10 @@ export default {
         }
       } catch (error) {
         console.error('Error al consultar estado:', error);
-        
+
         // Determinar el mensaje de error según el tipo de error
         let errorMessage = `❌ Error al consultar ${invoice.correlativo}`;
-        
+
         if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
           errorMessage = `⏱️ Timeout: El servidor no respondió a tiempo`;
         } else if (error.response?.status === 500) {
@@ -660,7 +698,9 @@ export default {
       totalItems,
       headers,
       getStatusColor,
+      getEstadoVisual,
       getEstadoVisualColor,
+      getEstadoVisualTexto,
       formatCurrency,
       formatDate,
       viewInvoice,

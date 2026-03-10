@@ -22,10 +22,10 @@
             <h2>Detalle de Factura: {{ invoice.correlativo }}</h2>
             <v-spacer></v-spacer>
             <v-chip
-              :color="getStatusColor(invoice.estadoSifen)"
+              :color="getStatusColor(invoice.estado)"
               variant="flat"
             >
-              {{ invoice.estadoSifen }}
+              {{ invoice.estado }}
             </v-chip>
             <v-btn
               color="info"
@@ -59,7 +59,7 @@
                     <p><strong>Fecha de Creación:</strong> {{ formatDate(invoice.fechaCreacion) }}</p>
                     <p v-if="invoice.fechaEnvio"><strong>Fecha de Envío:</strong> {{ formatDate(invoice.fechaEnvio) }}</p>
                     <p v-if="invoice.fechaProceso"><strong>Fecha de Proceso:</strong> {{ formatDateTime(invoice.fechaProceso) }}</p>
-                    <p><strong>Estado en SIFEN:</strong> {{ invoice.estadoSifen }}</p>
+                    <p><strong>Estado en SIFEN:</strong> {{ invoice.estado || 'No disponible' }}</p>
                     <p v-if="invoice.cdc"><strong>CDC:</strong> <span class="text-mono">{{ invoice.cdc }}</span></p>
                     <p v-if="invoice.codigoRetorno"><strong>Código de Retorno:</strong> {{ invoice.codigoRetorno }}</p>
                     <p v-if="invoice.mensajeRetorno"><strong>Mensaje:</strong> {{ invoice.mensajeRetorno }}</p>
@@ -140,7 +140,7 @@
                   <v-card-title class="text-h6">
                     Registros de Operación
                     <v-btn
-                      v-if="invoice.estadoSifen === 'error'"
+                      v-if="invoice.estado === 'error'"
                       color="warning"
                       variant="text"
                       @click="retryInvoice"
@@ -165,11 +165,11 @@
                           {{ item.tipoOperacion }}
                         </v-chip>
                       </template>
-                      
+
                       <template v-slot:item.fecha="{ item }">
                         {{ formatDateTime(item.fecha) }}
                       </template>
-                      
+
                       <template v-slot:item.estado="{ item }">
                         <v-chip
                           :color="getLogStateColor(item.estado)"
@@ -184,6 +184,162 @@
                 </v-card>
               </v-col>
             </v-row>
+
+            <!-- Eventos SIFEN -->
+            <v-row class="mt-4" v-if="invoice.cdc && invoice.estado === 'aceptado'">
+              <v-col cols="12">
+                <v-card outlined>
+                  <v-card-title class="text-h6">
+                    Eventos SIFEN
+                    <v-chip color="primary" class="ml-2" size="small">
+                      {{ eventos.length }} eventos
+                    </v-chip>
+                    <v-spacer></v-spacer>
+                    <v-btn
+                      color="warning"
+                      variant="outlined"
+                      size="small"
+                      @click="mostrarDialogoEvento"
+                    >
+                      <v-icon left>mdi-plus</v-icon>
+                      Registrar Evento
+                    </v-btn>
+                  </v-card-title>
+                  <v-card-text>
+                    <v-alert type="info" variant="tonal" class="mb-4">
+                      <strong>ℹ️ Eventos registrados:</strong> Los eventos como disconformidad, conformidad o cancelación 
+                      se registran en la SET pero no cambian el estado de aprobación de la factura.
+                    </v-alert>
+                    
+                    <v-data-table
+                      v-if="eventos.length > 0"
+                      :headers="eventoHeaders"
+                      :items="eventos"
+                      class="elevation-1"
+                    >
+                      <template v-slot:item.tipoEvento="{ item }">
+                        <v-chip
+                          :color="getTipoEventoColor(item.tipoEvento)"
+                          size="small"
+                          variant="flat"
+                        >
+                          {{ getTipoEventoNombre(item.tipoEvento) }}
+                        </v-chip>
+                      </template>
+
+                      <template v-slot:item.estadoEvento="{ item }">
+                        <v-chip
+                          :color="getEstadoEventoColor(item.estadoEvento)"
+                          size="small"
+                          variant="flat"
+                        >
+                          {{ item.estadoEvento }}
+                        </v-chip>
+                      </template>
+
+                      <template v-slot:item.fechaRegistro="{ item }">
+                        {{ formatDateTime(item.createdAt) }}
+                      </template>
+                    </v-data-table>
+
+                    <v-alert v-else type="info" variant="outlined">
+                      No hay eventos registrados para esta factura
+                    </v-alert>
+                  </v-card-text>
+                </v-card>
+              </v-col>
+            </v-row>
+
+            <!-- Diálogo para Registrar Evento -->
+            <v-dialog v-model="dialogoEvento" max-width="600">
+              <v-card>
+                <v-card-title class="text-h5">
+                  Registrar Evento SIFEN
+                </v-card-title>
+                <v-card-text>
+                  <v-alert type="warning" variant="tonal" class="mb-4">
+                    <strong>⚠️ Importante:</strong> Los eventos son irreversibles una vez registrados en la SET.
+                  </v-alert>
+
+                  <v-form ref="formEvento" v-model="formValido">
+                    <v-select
+                      v-model="nuevoEvento.tipoEvento"
+                      :items="tiposEvento"
+                      item-value="value"
+                      item-title="title"
+                      label="Tipo de Evento *"
+                      required
+                      outlined
+                      dense
+                      hint="Seleccione el tipo de evento a registrar"
+                    >
+                      <template v-slot:selection="{ item }">
+                        <div class="d-flex align-center">
+                          <v-chip
+                            :color="getTipoEventoColor(item.value)"
+                            size="x-small"
+                            class="mr-2"
+                          >
+                            {{ item.value }}
+                          </v-chip>
+                          {{ item.title }}
+                        </div>
+                      </template>
+                    </v-select>
+
+                    <v-textarea
+                      v-model="nuevoEvento.descripcion"
+                      label="Descripción / Motivo *"
+                      required
+                      outlined
+                      dense
+                      rows="3"
+                      counter="500"
+                      maxlength="500"
+                      hint="Explique el motivo del evento (máximo 500 caracteres)"
+                    ></v-textarea>
+
+                    <v-text-field
+                      v-model="nuevoEvento.usuarioNombre"
+                      label="Nombre del Usuario *"
+                      required
+                      outlined
+                      dense
+                      hint="Nombre de la persona que registra el evento"
+                    ></v-text-field>
+
+                    <v-text-field
+                      v-model="nuevoEvento.usuarioDocumento"
+                      label="Documento de Identidad *"
+                      required
+                      outlined
+                      dense
+                      hint="Número de RUC o CI del usuario"
+                    ></v-text-field>
+                  </v-form>
+                </v-card-text>
+                <v-card-actions>
+                  <v-spacer></v-spacer>
+                  <v-btn
+                    color="grey"
+                    variant="text"
+                    @click="dialogoEvento = false"
+                  >
+                    Cancelar
+                  </v-btn>
+                  <v-btn
+                    color="warning"
+                    variant="flat"
+                    :loading="enviandoEvento"
+                    :disabled="!formValido"
+                    @click="enviarEvento"
+                  >
+                    <v-icon left>mdi-send</v-icon>
+                    Enviar Evento
+                  </v-btn>
+                </v-card-actions>
+              </v-card>
+            </v-dialog>
           </v-card-text>
         </v-card>
       </v-col>
@@ -202,11 +358,33 @@ export default {
     const route = useRoute();
     const invoice = ref({});
     const logs = ref([]);
+    const eventos = ref([]);
     const refreshingStatus = ref(false);
     const statusSnackbar = ref(false);
     const statusSnackbarText = ref('');
     const statusSnackbarColor = ref('info');
     const statusSnackbarIcon = ref('mdi-information');
+
+    // Variables para evento
+    const dialogoEvento = ref(false);
+    const formValido = ref(false);
+    const enviandoEvento = ref(false);
+    const formEvento = ref(null);
+    const nuevoEvento = ref({
+      tipoEvento: '',
+      descripcion: '',
+      usuarioNombre: '',
+      usuarioDocumento: ''
+    });
+
+    const tiposEvento = [
+      { title: 'Disconformidad - Reportar errores o inconsistencias', value: 'disconformidad' },
+      { title: 'Conformidad - Confirmar que todo está correcto', value: 'conformidad' },
+      { title: 'Desconocimiento - Desconocer la operación', value: 'desconocimiento' },
+      { title: 'Notificación de Recepción - Acusar recibo', value: 'notificacion_recepcion' },
+      { title: 'Cancelación - Cancelar factura (solo emisor, 48hs)', value: 'cancelacion' },
+      { title: 'Devolución/Ajuste - Por nota de crédito/débito', value: 'devolucion_ajuste' }
+    ];
 
     const logHeaders = [
       { title: 'Tipo', key: 'tipoOperacion' },
@@ -215,7 +393,61 @@ export default {
       { title: 'Estado', key: 'estado' },
       { title: 'Detalles', key: 'detalle' }
     ];
-    
+
+    const eventoHeaders = [
+      { title: 'Tipo', key: 'tipoEvento' },
+      { title: 'Descripción', key: 'descripcion' },
+      { title: 'Estado', key: 'estadoEvento' },
+      { title: 'Fecha Registro', key: 'fechaRegistro' },
+      { title: 'Código Retorno', key: 'codigoRetorno' }
+    ];
+
+    const getTipoEventoColor = (tipo) => {
+      switch(tipo) {
+        case 'cancelacion':
+          return 'red';
+        case 'conformidad':
+          return 'green';
+        case 'disconformidad':
+          return 'orange';
+        case 'desconocimiento':
+          return 'purple';
+        case 'notificacion_recepcion':
+          return 'blue';
+        case 'devolucion_ajuste':
+          return 'amber';
+        default:
+          return 'grey';
+      }
+    };
+
+    const getTipoEventoNombre = (tipo) => {
+      const nombres = {
+        'cancelacion': 'Cancelación',
+        'conformidad': 'Conformidad',
+        'disconformidad': 'Disconformidad',
+        'desconocimiento': 'Desconocimiento',
+        'notificacion_recepcion': 'Notificación de Recepción',
+        'devolucion_ajuste': 'Devolución/Ajuste'
+      };
+      return nombres[tipo] || tipo;
+    };
+
+    const getEstadoEventoColor = (estado) => {
+      switch(estado) {
+        case 'registrado':
+          return 'success';
+        case 'enviado':
+          return 'info';
+        case 'rechazado':
+          return 'error';
+        case 'error':
+          return 'error';
+        default:
+          return 'info';
+      }
+    };
+
     const getStatusColor = (status) => {
       switch(status) {
         case 'enviado':
@@ -290,7 +522,15 @@ export default {
         const response = await axios.get(`/api/invoices/${route.params.id}`);
         console.log('✅ Respuesta de factura:', response.data);
         invoice.value = response.data.data;  // ← Los datos están en response.data.data
-        
+
+        // Debug: Verificar campos para eventos
+        console.log('🔍 Debug para Eventos SIFEN:');
+        console.log('   - invoice.cdc:', invoice.value.cdc);
+        console.log('   - invoice.estado:', invoice.value.estado);
+        console.log('   - ¿Tiene CDC?:', !!invoice.value.cdc);
+        console.log('   - ¿Es aceptado?:', invoice.value.estado === 'aceptado');
+        console.log('   - ¿Debe mostrar sección?:', !!invoice.value.cdc && invoice.value.estado === 'aceptado');
+
         // Debug: Verificar digestValue
         console.log('🔐 DigestValue recibido:', invoice.value.digestValue || 'NO DISPONIBLE');
         console.log('📋 Todos los campos de la factura:', Object.keys(invoice.value));
@@ -308,7 +548,66 @@ export default {
         console.error('Error cargando logs:', error);
       }
     };
-    
+
+    const loadEventos = async () => {
+      try {
+        const response = await axios.get(`/api/invoices/${route.params.id}/eventos`);
+        eventos.value = response.data.eventos || [];
+      } catch (error) {
+        console.error('Error cargando eventos:', error);
+      }
+    };
+
+    const mostrarDialogoEvento = () => {
+      dialogoEvento.value = true;
+      nuevoEvento.value = {
+        tipoEvento: '',
+        descripcion: '',
+        usuarioNombre: '',
+        usuarioDocumento: ''
+      };
+      if (formEvento.value) {
+        formEvento.value.resetValidation();
+      }
+    };
+
+    const enviarEvento = async () => {
+      if (!formValido.value) return;
+
+      enviandoEvento.value = true;
+
+      try {
+        const response = await axios.post('/api/eventos/enviar', {
+          invoiceId: route.params.id,
+          tipoEvento: nuevoEvento.value.tipoEvento,
+          descripcion: nuevoEvento.value.descripcion,
+          usuario: {
+            nombre: nuevoEvento.value.usuarioNombre,
+            documentoNumero: nuevoEvento.value.usuarioDocumento
+          }
+        });
+
+        dialogoEvento.value = false;
+        
+        statusSnackbarText.value = `✅ Evento ${getTipoEventoNombre(nuevoEvento.value.tipoEvento)} registrado exitosamente`;
+        statusSnackbarColor.value = 'success';
+        statusSnackbarIcon.value = 'mdi-check-circle';
+        statusSnackbar.value = true;
+
+        // Recargar eventos
+        await loadEventos();
+
+      } catch (error) {
+        console.error('Error enviando evento:', error);
+        statusSnackbarText.value = '❌ Error al enviar evento: ' + (error.response?.data?.mensaje || error.message);
+        statusSnackbarColor.value = 'error';
+        statusSnackbarIcon.value = 'mdi-alert-circle';
+        statusSnackbar.value = true;
+      } finally {
+        enviandoEvento.value = false;
+      }
+    };
+
     const retryInvoice = async () => {
       if (confirm('¿Está seguro de reintentar el envío de esta factura?')) {
         try {
@@ -410,7 +709,18 @@ export default {
       refreshingStatus.value = true;
       try {
         const response = await axios.post(`/api/invoices/${route.params.id}/refresh-status`);
-        
+
+        // Verificar si es estado final (no se consultó SET)
+        if (response.data.esEstadoFinal && !response.data.consultoSET) {
+          statusSnackbarText.value = `✅ Estado final: ${response.data.data.estado} - No es necesario consultar a SET`;
+          statusSnackbarColor.value = response.data.data.estadoVisual === 'aceptado' ? 'success' :
+                                      response.data.data.estadoVisual === 'rechazado' ? 'error' : 'warning';
+          statusSnackbarIcon.value = 'mdi-check-circle';
+          statusSnackbar.value = true;
+          return;
+        }
+
+        // Verificar si hubo cambio de estado
         if (response.data.estadoCambio) {
           statusSnackbarText.value = `Estado actualizado: ${response.data.estadoAnterior} → ${response.data.estadoActual}`;
           statusSnackbarColor.value = 'success';
@@ -419,7 +729,7 @@ export default {
           // Mensaje más descriptivo según el estado actual
           const estadoActual = response.data.estadoActual;
           let mensajeEstado = '';
-          
+
           switch(estadoActual) {
             case 'procesando':
               mensajeEstado = 'La factura está siendo procesada por SIFEN';
@@ -436,17 +746,17 @@ export default {
             default:
               mensajeEstado = `Estado actual: ${estadoActual}`;
           }
-          
+
           statusSnackbarText.value = mensajeEstado;
-          statusSnackbarColor.value = estadoActual === 'aceptado' ? 'success' : 
-                                      estadoActual === 'rechazado' ? 'error' : 
+          statusSnackbarColor.value = estadoActual === 'aceptado' ? 'success' :
+                                      estadoActual === 'rechazado' ? 'error' :
                                       estadoActual === 'procesando' ? 'warning' : 'info';
           statusSnackbarIcon.value = estadoActual === 'aceptado' ? 'mdi-check-circle' :
                                      estadoActual === 'rechazado' ? 'mdi-alert-circle' :
                                      estadoActual === 'procesando' ? 'mdi-timer-sand' : 'mdi-information';
         }
         statusSnackbar.value = true;
-        
+
         if (response.data.estadoCambio) {
           await loadInvoice();
           await loadLogs();
@@ -462,16 +772,21 @@ export default {
     };
 
     onMounted(async () => {
-      await Promise.all([loadInvoice(), loadLogs()]);
+      await Promise.all([loadInvoice(), loadLogs(), loadEventos()]);
     });
 
     return {
       invoice,
       logs,
+      eventos,
       logHeaders,
+      eventoHeaders,
       getStatusColor,
       getLogStatusColor,
       getLogStateColor,
+      getTipoEventoColor,
+      getTipoEventoNombre,
+      getEstadoEventoColor,
       formatCurrency,
       formatDate,
       formatDateTime,
@@ -484,7 +799,16 @@ export default {
       statusSnackbar,
       statusSnackbarText,
       statusSnackbarColor,
-      statusSnackbarIcon
+      statusSnackbarIcon,
+      // Evento
+      dialogoEvento,
+      formEvento,
+      formValido,
+      enviandoEvento,
+      nuevoEvento,
+      tiposEvento,
+      mostrarDialogoEvento,
+      enviarEvento
     };
   }
 };
