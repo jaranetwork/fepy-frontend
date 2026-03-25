@@ -284,7 +284,7 @@ npm run test
 
 ## Proyectos
 
-- [FEPY backend](https://github.com/jaranetwork/fepy-frontend) sistema de generación y envío de factura electrónica al sistema SIFEN Paraguay
+- [FEPY backend](https://github.com/jaranetwork/fepy-backend) sistema de generación y envío de factura electrónica al sistema SIFEN Paraguay
 - [Módulo ERPNext](https://github.com/jaranetwork/einvoice) para el envío de facturas a FEPY
 
 ## 📚 Recursos
