@@ -208,6 +208,16 @@
             </v-chip>
           </template>
 
+          <template v-slot:item.proceso="{ item }">
+            <v-chip
+              :color="getProcesoColor(item.proceso)"
+              variant="flat"
+              size="small"
+            >
+              {{ getProcesoTexto(item.proceso) }}
+            </v-chip>
+          </template>
+
           <template v-slot:item.total="{ item }">
             Gs. {{ formatCurrency(item.total) }}
           </template>
@@ -351,6 +361,7 @@ export default {
       { title: 'Cliente', key: 'cliente.nombre' },
       { title: 'Total', key: 'total' },
       { title: 'Estado', key: 'estado' },
+      { title: 'Proceso', key: 'proceso' },
       { title: 'Fecha', key: 'createdAt' },
       { title: 'Acciones', key: 'actions', sortable: false }
     ];
@@ -410,6 +421,27 @@ export default {
     const getEstadoVisualTexto = (estadoVisual, codigoRetorno, estado) => {
       const visual = getEstadoVisual(estadoVisual, codigoRetorno, estado);
       return visual;
+    };
+
+    // Funciones para el campo proceso
+    const getProcesoColor = (proceso) => {
+      if (proceso === 'Terminado') {
+        return 'success';  // Verde - XML y PDF generados
+      } else if (proceso === 'Fallido') {
+        return 'error';    // Rojo - Error en generación
+      } else {
+        return 'warning';  // Amarillo - En proceso (null)
+      }
+    };
+
+    const getProcesoTexto = (proceso) => {
+      if (proceso === 'Terminado') {
+        return '✅ Terminado';
+      } else if (proceso === 'Fallido') {
+        return '❌ Fallido';
+      } else {
+        return '⏳ Pendiente';
+      }
     };
 
     const formatCurrency = (amount) => {
@@ -701,6 +733,8 @@ export default {
       getEstadoVisual,
       getEstadoVisualColor,
       getEstadoVisualTexto,
+      getProcesoColor,
+      getProcesoTexto,
       formatCurrency,
       formatDate,
       viewInvoice,

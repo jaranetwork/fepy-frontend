@@ -60,6 +60,16 @@
                     <p v-if="invoice.fechaEnvio"><strong>Fecha de Envío:</strong> {{ formatDate(invoice.fechaEnvio) }}</p>
                     <p v-if="invoice.fechaProceso"><strong>Fecha de Proceso:</strong> {{ formatDateTime(invoice.fechaProceso) }}</p>
                     <p><strong>Estado en SIFEN:</strong> {{ invoice.estado || 'No disponible' }}</p>
+                    <p>
+                      <strong>Proceso:</strong>
+                      <v-chip
+                        :color="getProcesoColor(invoice.proceso)"
+                        size="small"
+                        class="ml-2"
+                      >
+                        {{ getProcesoTexto(invoice.proceso) }}
+                      </v-chip>
+                    </p>
                     <p v-if="invoice.cdc"><strong>CDC:</strong> <span class="text-mono">{{ invoice.cdc }}</span></p>
                     <p v-if="invoice.codigoRetorno"><strong>Código de Retorno:</strong> {{ invoice.codigoRetorno }}</p>
                     <p v-if="invoice.mensajeRetorno"><strong>Mensaje:</strong> {{ invoice.mensajeRetorno }}</p>
@@ -462,7 +472,28 @@ export default {
           return 'info';
       }
     };
-    
+
+    // Funciones para el campo proceso
+    const getProcesoColor = (proceso) => {
+      if (proceso === 'Terminado') {
+        return 'success';  // Verde - XML y PDF generados
+      } else if (proceso === 'Fallido') {
+        return 'error';    // Rojo - Error en generación
+      } else {
+        return 'warning';  // Amarillo - En proceso (null)
+      }
+    };
+
+    const getProcesoTexto = (proceso) => {
+      if (proceso === 'Terminado') {
+        return 'Terminado';
+      } else if (proceso === 'Fallido') {
+        return 'Fallido';
+      } else {
+        return 'Pendiente';
+      }
+    };
+
     const getLogStatusColor = (tipo, estado) => {
       // Si el estado es error, mostrar en rojo independientemente del tipo
       if (estado === 'error') {
@@ -782,6 +813,8 @@ export default {
       logHeaders,
       eventoHeaders,
       getStatusColor,
+      getProcesoColor,
+      getProcesoTexto,
       getLogStatusColor,
       getLogStateColor,
       getTipoEventoColor,
