@@ -382,7 +382,7 @@ export default {
     };
 
     // Función para determinar el estado visual según código de retorno SIFEN v150
-    // Retorna: 'aceptado', 'observado', o 'rechazado'
+    // Retorna: 'aceptado', 'observado', 'rechazado' o 'error'
     const getEstadoVisual = (estadoVisual, codigoRetorno, estado) => {
       // Si ya tenemos estadoVisual, usarlo directamente
       if (estadoVisual) {
@@ -398,6 +398,10 @@ export default {
       if (estado === 'observado' || estado === 'procesando') {
         return 'observado';
       }
+      // Error de conexión (rojo)
+      if (estado === 'error') {
+        return 'error';
+      }
       // Todos los demás como rechazado (rojo)
       return 'rechazado';
     };
@@ -412,6 +416,8 @@ export default {
           return 'amber';    // Amarillo
         case 'rechazado':
           return 'error';    // Rojo
+        case 'error':
+          return 'error';    // Rojo - Error de conexión
         default:
           return 'info';
       }
@@ -425,9 +431,9 @@ export default {
 
     // Funciones para el campo proceso
     const getProcesoColor = (proceso) => {
-      if (proceso === 'Terminado') {
+      if (proceso === 'Completado') {
         return 'success';  // Verde - XML y PDF generados
-      } else if (proceso === 'Fallido') {
+      } else if (proceso === 'No completado') {
         return 'error';    // Rojo - Error en generación
       } else {
         return 'warning';  // Amarillo - En proceso (null)
@@ -435,10 +441,10 @@ export default {
     };
 
     const getProcesoTexto = (proceso) => {
-      if (proceso === 'Terminado') {
-        return '✅ Terminado';
-      } else if (proceso === 'Fallido') {
-        return '❌ Fallido';
+      if (proceso === 'Completado') {
+        return '✅ Completado';
+      } else if (proceso === 'No completado') {
+        return '❌ No completado';
       } else {
         return '⏳ Pendiente';
       }
@@ -549,6 +555,7 @@ export default {
         if (response.data.esEstadoFinal && !response.data.consultoSET) {
           const estadoData = response.data.data;
           const color = estadoData.estadoVisual === 'aceptado' ? 'success' :
+                        estadoData.estadoVisual === 'error' ? 'error' :
                         estadoData.estadoVisual === 'rechazado' ? 'error' : 'warning';
           const icono = 'mdi-check-circle';
           statusSnackbarText.value = `✅ ${invoice.correlativo}: Estado final (${estadoData.estado}) - No se consultó SET`;

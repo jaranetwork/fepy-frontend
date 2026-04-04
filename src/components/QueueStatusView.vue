@@ -351,7 +351,7 @@ export default {
     formatJobEstado(estado) {
       const estados = {
         'completed': 'Completado',
-        'failed': 'Fallido',
+        'failed': 'No completado',
         'active': 'Procesando',
         'waiting': 'En Espera'
       }

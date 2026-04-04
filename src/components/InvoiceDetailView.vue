@@ -475,9 +475,9 @@ export default {
 
     // Funciones para el campo proceso
     const getProcesoColor = (proceso) => {
-      if (proceso === 'Terminado') {
+      if (proceso === 'Completado') {
         return 'success';  // Verde - XML y PDF generados
-      } else if (proceso === 'Fallido') {
+      } else if (proceso === 'No completado') {
         return 'error';    // Rojo - Error en generación
       } else {
         return 'warning';  // Amarillo - En proceso (null)
@@ -485,10 +485,10 @@ export default {
     };
 
     const getProcesoTexto = (proceso) => {
-      if (proceso === 'Terminado') {
-        return 'Terminado';
-      } else if (proceso === 'Fallido') {
-        return 'Fallido';
+      if (proceso === 'Completado') {
+        return 'Completado';
+      } else if (proceso === 'No completado') {
+        return 'No completado';
       } else {
         return 'Pendiente';
       }
@@ -745,6 +745,7 @@ export default {
         if (response.data.esEstadoFinal && !response.data.consultoSET) {
           statusSnackbarText.value = `✅ Estado final: ${response.data.data.estado} - No es necesario consultar a SET`;
           statusSnackbarColor.value = response.data.data.estadoVisual === 'aceptado' ? 'success' :
+                                      response.data.data.estadoVisual === 'error' ? 'error' :
                                       response.data.data.estadoVisual === 'rechazado' ? 'error' : 'warning';
           statusSnackbarIcon.value = 'mdi-check-circle';
           statusSnackbar.value = true;
