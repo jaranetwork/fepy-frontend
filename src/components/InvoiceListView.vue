@@ -120,6 +120,47 @@
       </v-card>
     </v-dialog>
 
+    <!-- Diálogo de Confirmación para Eliminar Factura -->
+    <v-dialog v-model="deleteDialog" max-width="500" persistent>
+      <v-card>
+        <v-card-title class="text-h5 error--text">
+          <v-icon left color="error">mdi-alert-circle</v-icon>
+          Confirmar Eliminación
+        </v-card-title>
+        <v-card-text>
+          <v-alert type="error" variant="tonal" class="mb-4">
+            <strong>⚠️ Atención:</strong> Esta acción NO se puede deshacer.
+          </v-alert>
+          <p>¿Está seguro de que desea eliminar la siguiente factura?</p>
+          <v-card outlined class="pa-4 mt-3">
+            <p><strong>Correlativo:</strong> {{ deleteInvoiceData?.correlativo }}</p>
+            <p><strong>Cliente:</strong> {{ deleteInvoiceData?.cliente?.nombre }}</p>
+            <p><strong>Estado:</strong> {{ deleteInvoiceData?.estado }}</p>
+          </v-card>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn
+            color="grey"
+            variant="text"
+            @click="deleteDialog = false"
+            :disabled="deleting"
+          >
+            Cancelar
+          </v-btn>
+          <v-btn
+            color="error"
+            variant="flat"
+            @click="executeDeleteInvoice"
+            :loading="deleting"
+          >
+            <v-icon left>mdi-delete</v-icon>
+            Eliminar
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-card>
       <v-card-title class="d-flex align-center flex-wrap">
         <h2>Lista de Facturas</h2>
@@ -275,6 +316,13 @@
                   </template>
                   <v-list-item-title class="text-warning">Reintentar</v-list-item-title>
                 </v-list-item>
+                <v-divider></v-divider>
+                <v-list-item @click="confirmDeleteInvoice(item); item.menuOpen = false">
+                  <template v-slot:prepend>
+                    <v-icon color="error" size="small">mdi-delete</v-icon>
+                  </template>
+                  <v-list-item-title class="text-error">Eliminar</v-list-item-title>
+                </v-list-item>
               </v-list>
             </v-menu>
           </template>
@@ -314,6 +362,9 @@ export default {
     const retryDialog = ref(false);
     const retrying = ref(false);
     const retryInvoiceData = ref(null);
+    const deleteDialog = ref(false);
+    const deleting = ref(false);
+    const deleteInvoiceData = ref(null);
     const clearing = ref(false);
 
     const searchTypes = [
@@ -701,6 +752,37 @@ export default {
       }
     };
 
+    const confirmDeleteInvoice = (invoice) => {
+      deleteInvoiceData.value = invoice;
+      deleteDialog.value = true;
+    };
+
+    const executeDeleteInvoice = async () => {
+      if (!deleteInvoiceData.value) return;
+
+      deleting.value = true;
+      try {
+        await axios.delete(`/api/invoices/${deleteInvoiceData.value._id}`);
+        statusSnackbarText.value = `✅ Factura eliminada: ${deleteInvoiceData.value.correlativo}`;
+        statusSnackbarColor.value = 'success';
+        statusSnackbarIcon.value = 'mdi-check-circle';
+        statusSnackbar.value = true;
+        deleteDialog.value = false;
+        deleteInvoiceData.value = null;
+        loadInvoices();
+      } catch (error) {
+        console.error('Error eliminando factura:', error);
+        statusSnackbarText.value = `❌ Error al eliminar: ${deleteInvoiceData.value.correlativo}`;
+        statusSnackbarColor.value = 'error';
+        statusSnackbarIcon.value = 'mdi-alert-circle';
+        statusSnackbar.value = true;
+        deleteDialog.value = false;
+        deleteInvoiceData.value = null;
+      } finally {
+        deleting.value = false;
+      }
+    };
+
     const changePage = (page) => {
       currentPage.value = page;
       loadInvoices();
@@ -750,6 +832,11 @@ export default {
       refreshInvoiceStatus,
       confirmRetryInvoice,
       executeRetryInvoice,
+      confirmDeleteInvoice,
+      executeDeleteInvoice,
+      deleteDialog,
+      deleting,
+      deleteInvoiceData,
       changePage,
       confirmClearDatabase,
       executeClearDatabase,

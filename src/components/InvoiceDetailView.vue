@@ -41,7 +41,7 @@
               color="error"
               variant="outlined"
               class="ml-2"
-              @click="confirmDeleteInvoice"
+              @click="dialogoEliminar = true"
             >
               <v-icon left>mdi-delete</v-icon>
               Eliminar
@@ -99,18 +99,7 @@
                 </v-card>
               </v-col>
             </v-row>
-
-            <v-row class="mt-4">
-              <v-col cols="12">
-                <v-card outlined>
-                  <v-card-title class="text-h6">Datos de la Factura</v-card-title>
-                  <v-card-text>
-                    <pre style="white-space: pre-wrap; word-break: break-all;">{{ JSON.stringify(invoice.datosFactura, null, 2) }}</pre>
-                  </v-card-text>
-                </v-card>
-              </v-col>
-            </v-row>
-
+<!--Archivos-->
             <v-row class="mt-4">
               <v-col cols="12">
                 <v-card outlined>
@@ -139,57 +128,6 @@
                         No hay archivos disponibles aún.
                       </v-alert>
                     </div>
-                  </v-card-text>
-                </v-card>
-              </v-col>
-            </v-row>
-
-            <v-row class="mt-4">
-              <v-col cols="12">
-                <v-card outlined>
-                  <v-card-title class="text-h6">
-                    Registros de Operación
-                    <v-btn
-                      v-if="invoice.estado === 'error'"
-                      color="warning"
-                      variant="text"
-                      @click="retryInvoice"
-                      class="ml-4"
-                    >
-                      <v-icon left>mdi-reload</v-icon>
-                      Reintentar Envío
-                    </v-btn>
-                  </v-card-title>
-                  <v-card-text>
-                    <v-data-table
-                      :headers="logHeaders"
-                      :items="logs"
-                      class="elevation-1"
-                    >
-                      <template v-slot:item.tipoOperacion="{ item }">
-                        <v-chip
-                          :color="getLogStatusColor(item.tipoOperacion, item.estado)"
-                          size="small"
-                          variant="flat"
-                        >
-                          {{ item.tipoOperacion }}
-                        </v-chip>
-                      </template>
-
-                      <template v-slot:item.fecha="{ item }">
-                        {{ formatDateTime(item.fecha) }}
-                      </template>
-
-                      <template v-slot:item.estado="{ item }">
-                        <v-chip
-                          :color="getLogStateColor(item.estado)"
-                          size="small"
-                          variant="flat"
-                        >
-                          {{ item.estado }}
-                        </v-chip>
-                      </template>
-                    </v-data-table>
                   </v-card-text>
                 </v-card>
               </v-col>
@@ -259,7 +197,7 @@
                 </v-card>
               </v-col>
             </v-row>
-
+            
             <!-- Diálogo para Registrar Evento -->
             <v-dialog v-model="dialogoEvento" max-width="600">
               <v-card>
@@ -350,6 +288,132 @@
                 </v-card-actions>
               </v-card>
             </v-dialog>
+
+            <!-- Diálogo de Confirmación para Eliminar Factura -->
+            <v-dialog v-model="dialogoEliminar" max-width="500" persistent>
+              <v-card>
+                <v-card-title class="text-h5 error--text">
+                  <v-icon left color="error">mdi-alert-circle</v-icon>
+                  Confirmar Eliminación
+                </v-card-title>
+                <v-card-text>
+                  <v-alert type="error" variant="tonal" class="mb-4">
+                    <strong>⚠️ Atención:</strong> Esta acción NO se puede deshacer.
+                  </v-alert>
+                  <p>¿Está seguro de que desea eliminar la siguiente factura?</p>
+                  <v-card outlined class="pa-4 mt-3">
+                    <p><strong>Correlativo:</strong> {{ invoice.correlativo }}</p>
+                    <p><strong>Cliente:</strong> {{ invoice.cliente?.nombre }}</p>
+                    <p><strong>Estado:</strong> {{ invoice.estado }}</p>
+                  </v-card>
+                </v-card-text>
+                <v-card-actions>
+                  <v-spacer></v-spacer>
+                  <v-btn
+                    color="grey"
+                    variant="text"
+                    @click="dialogoEliminar = false"
+                    :disabled="eliminando"
+                  >
+                    Cancelar
+                  </v-btn>
+                  <v-btn
+                    color="error"
+                    variant="flat"
+                    @click="deleteInvoice"
+                    :loading="eliminando"
+                  >
+                    <v-icon left>mdi-delete</v-icon>
+                    Eliminar
+                  </v-btn>
+                </v-card-actions>
+              </v-card>
+            </v-dialog>
+
+<!--Datos JSON-->
+            <v-row class="mt-4">
+              <v-col cols="12">
+                <v-expansion-panels variant="accordion">
+                  <v-expansion-panel>
+                    <v-expansion-panel-title class="text-h6">Datos de la Factura JSON</v-expansion-panel-title>
+                    <v-expansion-panel-text>
+                      <div style="overflow: auto; max-height: 600px; padding: 8px;">
+                        <pre style="white-space: pre-wrap; word-break: break-all; margin: 0;">{{ JSON.stringify(invoice.datosFactura, null, 2) }}</pre>
+                      </div>
+                    </v-expansion-panel-text>
+                  </v-expansion-panel>
+                </v-expansion-panels>
+              </v-col>
+            </v-row>
+
+            <v-row class="mt-4">
+              <v-col cols="12">
+                <v-expansion-panels variant="accordion">
+                  <v-expansion-panel>
+                    <v-expansion-panel-title class="text-h6">Datos de la Factura XML</v-expansion-panel-title>
+                    <v-expansion-panel-text>
+                      <div v-if="invoice.xmlContent" style="overflow: auto; max-height: 600px; padding: 8px;">
+                        <pre style="white-space: pre-wrap; word-break: break-all; margin: 0;">{{ invoice.xmlContent }}</pre>
+                      </div>
+                      <v-alert v-else type="info" class="ma-2">
+                        XML no disponible aún. Se genera cuando la factura es procesada.
+            f          </v-alert>
+                    </v-expansion-panel-text>
+                  </v-expansion-panel>
+                </v-expansion-panels>
+              </v-col>
+            </v-row>
+<!--Logs-->
+            <v-row class="mt-4">
+              <v-col cols="12">
+                <v-card outlined>
+                  <v-card-title class="text-h6">
+                    Registros de Operación
+                    <v-btn
+                      v-if="invoice.estado === 'error'"
+                      color="warning"
+                      variant="text"
+                      @click="retryInvoice"
+                      class="ml-4"
+                    >
+                      <v-icon left>mdi-reload</v-icon>
+                      Reintentar Envío
+                    </v-btn>
+                  </v-card-title>
+                  <v-card-text>
+                    <v-data-table
+                      :headers="logHeaders"
+                      :items="logs"
+                      class="elevation-1"
+                    >
+                      <template v-slot:item.tipoOperacion="{ item }">
+                        <v-chip
+                          :color="getLogStatusColor(item.tipoOperacion, item.estado)"
+                          size="small"
+                          variant="flat"
+                        >
+                          {{ item.tipoOperacion }}
+                        </v-chip>
+                      </template>
+
+                      <template v-slot:item.fecha="{ item }">
+                        {{ formatDateTime(item.fecha) }}
+                      </template>
+
+                      <template v-slot:item.estado="{ item }">
+                        <v-chip
+                          :color="getLogStateColor(item.estado)"
+                          size="small"
+                          variant="flat"
+                        >
+                          {{ item.estado }}
+                        </v-chip>
+                      </template>
+                    </v-data-table>
+                  </v-card-text>
+                </v-card>
+              </v-col>
+            </v-row>
           </v-card-text>
         </v-card>
       </v-col>
@@ -377,6 +441,8 @@ export default {
 
     // Variables para evento
     const dialogoEvento = ref(false);
+    const dialogoEliminar = ref(false);
+    const eliminando = ref(false);
     const formValido = ref(false);
     const enviandoEvento = ref(false);
     const formEvento = ref(null);
@@ -654,19 +720,21 @@ export default {
     };
 
     const confirmDeleteInvoice = () => {
-      if (confirm(`⚠️ ¿Está SEGURO de que desea eliminar esta factura?\n\nCorrelativo: ${invoice.value.correlativo}\n\nEsta acción NO se puede deshacer.`)) {
-        deleteInvoice();
-      }
+      dialogoEliminar.value = true;
     };
 
     const deleteInvoice = async () => {
+      eliminando.value = true;
       try {
         const response = await axios.delete(`/api/invoices/${route.params.id}`);
+        dialogoEliminar.value = false;
         alert('✅ ' + response.data.message);
         window.location.href = '/invoices';
       } catch (error) {
         console.error('Error eliminando factura:', error);
         alert('❌ Error al eliminar la factura: ' + (error.response?.data?.message || error.message));
+      } finally {
+        eliminando.value = false;
       }
     };
 
@@ -842,7 +910,11 @@ export default {
       nuevoEvento,
       tiposEvento,
       mostrarDialogoEvento,
-      enviarEvento
+      enviarEvento,
+      // Eliminar
+      dialogoEliminar,
+      confirmDeleteInvoice,
+      deleteInvoice
     };
   }
 };
